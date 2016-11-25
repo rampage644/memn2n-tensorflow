@@ -34,24 +34,23 @@ def main(argv=None):
         model = memn2n.model.MemN2N(len(word2idx), FLAGS.embedding_size, FLAGS.sentence_length, FLAGS.memory_size)
 
         sess.run(tf.initialize_all_variables())
+        for e in range(FLAGS.epoch):
+            for step in range(0, len(mem_train), FLAGS.batch_size):
+                start, end = step, step+FLAGS.batch_size if step + FLAGS.batch_size < len(mem_train) else None
+                loss, predicted, _ = sess.run([model.loss, model.predicted, model.train_op], {
+                    model.x: mem_train[start:end],
+                    model.q: query_train[start:end],
+                    model.a: answer_train[start:end]
+                })
 
-    for e in range(FLAGS.epoch):
-        for step in range(0, len(mem_train), FLAGS.batch_size):
-            start, end = step, step+FLAGS.batch_size if step + FLAGS.batch_size < len(mem_train) else None
-            loss, predicted, _ = sess.run([model.loss, model.predicted, model.train_op], {
-                model.x: mem_train[start:end],
-                model.q: query_train[start:end],
-                model.a: answer_train[start:end]
+                print('loss={}'.format(loss))
+
+            predicted = sess.run(model.predicted, {
+                model.x: mem_test,
+                model.q: query_test
             })
 
-            print('loss={}'.format(loss))
-
-        predicted = sess.run(model.predicted, {
-            model.x: mem_test,
-            model.q: query_test
-        })
-
-        print('accuracy={}'.format(100.0 * (predicted == answer_test).astype(np.int32).sum() / len(predicted)))
+            print('accuracy={}'.format(100.0 * (predicted == answer_test).astype(np.int32).sum() / len(predicted)))
 
 if __name__ == '__main__':
     tf.app.run()
