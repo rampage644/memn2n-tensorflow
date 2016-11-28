@@ -6,6 +6,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import os
+import pickle
 import numpy as np
 from nltk.tokenize import word_tokenize as tokenize
 
@@ -38,8 +39,8 @@ def load_dataset(filename):
 def load_dataset_for(task, directory):
     '''Load train and test datasets for task_id = task'''
 
-    train_set_filename = [f for f in os.listdir(directory) if 'qa' + str(task) in f and 'train' in f][0]
-    test_set_filename = [f for f in os.listdir(directory) if 'qa' + str(task) in f and 'test' in f][0]
+    train_set_filename = [f for f in os.listdir(directory) if 'qa' + str(task) + '_' in f and 'train' in f][0]
+    test_set_filename = [f for f in os.listdir(directory) if 'qa' + str(task) + '_' in f and 'test' in f][0]
 
     return (
         load_dataset(os.path.join(directory, train_set_filename)),
@@ -76,3 +77,22 @@ def vectorize_dataset(dataset, word2idx, memory_size, sentence_length):
         answer[idx] = word2idx_func(a)
     return facts, query, answer
 
+
+def moving_average(a, n=3) :
+    '''Simple moving average function.'''
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
+
+
+def load_vocabulary(directory):
+    if os.path.exists(os.path.join(directory, '.memn2n_voc')):
+        with open(os.path.join(directory, '.memn2n_voc'), 'rb') as pfile:
+            word2idx, idx2word = pickle.load(pfile)
+    else:
+        word2idx = create_vocabulary(directory)
+        idx2word = {v: k for k,v in word2idx.items()}
+        with open(os.path.join(directory, '.memn2n_voc'), 'wb') as pfile:
+            pickle.dump((word2idx, idx2word), pfile)
+
+    return word2idx, idx2word
