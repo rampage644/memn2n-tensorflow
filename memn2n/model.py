@@ -34,13 +34,16 @@ class MemN2N(object):
             collections=[tf.GraphKeys.GLOBAL_STEP, tf.GraphKeys.VARIABLES]
         )
 
+        self.learning_rate = tf.train.exponential_decay(
+            self.lr, self.global_step, 100000, 0.96, staircase=True)
+
         with tf.variable_scope('input'):
             # sentences - stories - facts
             self.x = tf.placeholder(tf.int32, [None, self.memory_size, self.sentence_length], name='facts')
             self.q = tf.placeholder(tf.int32, [None, self.sentence_length], name='query')
             self.a = tf.placeholder(tf.int32, [None], name='answer')
 
-        with tf.variable_scope('embeddings', initializer=tf.random_normal_initializer(stddev=.1)):
+        with tf.variable_scope('embeddings'):
             # +1 is for fixed zero input
             zero_embedding = tf.zeros([1, self.embedding_size])
 
@@ -74,7 +77,7 @@ class MemN2N(object):
             self.u = tf.reduce_sum(tf.nn.embedding_lookup(self.B, self.q, name='u_pre'), reduction_indices=[1], name='u', keep_dims=True)
 
             self.probs = tf.reduce_sum(tf.mul(self.u, self.memory_input, name='u-m_i'), reduction_indices=[2], name='probs', keep_dims=True)
-            self.softmax_probs = tf.nn.softmax(self.probs, name='softmax_probs')
+            self.softmax_probs = tf.nn.softmax(self.probs, name='softmax_probs', dim=1)
 
             self.o = tf.reduce_sum(tf.mul(self.memory_output, self.softmax_probs, name='p-c_i'), reduction_indices=[1], name='o')
             self.logits = tf.matmul(tf.squeeze(self.u) + self.o, self.W, name='logits')
@@ -98,7 +101,7 @@ class MemN2N(object):
 
     def _create_train(self):
         with tf.variable_scope('training'):
-            train_op = tf.train.AdamOptimizer(self.lr)
+            train_op = tf.train.AdamOptimizer(self.learning_rate)
             gvs = train_op.compute_gradients(self.loss)
             capped_gvs = [(tf.clip_by_norm(grad, 40.0), var) for grad, var in gvs]
             self.train_op = train_op.apply_gradients(capped_gvs, global_step=self.global_step)
