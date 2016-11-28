@@ -51,6 +51,8 @@ class MemN2N(object):
                 zero_embedding,
                 tf.get_variable('A', [self.vocab_size, self.embedding_size], tf.float32),
             ])
+            self.TA = tf.get_variable('TA', [self.memory_size, self.embedding_size], tf.float32)
+
             self.B = tf.concat(0, [
                 zero_embedding,
                 tf.get_variable('B', [self.vocab_size, self.embedding_size], tf.float32)
@@ -72,7 +74,7 @@ class MemN2N(object):
 
     def _create_inference(self):
         with tf.variable_scope('model'):
-            self.memory_input = tf.reduce_sum(tf.nn.embedding_lookup(self.A, self.x, name='m_i_pre'), reduction_indices=[2], name='m_i')
+            self.memory_input = tf.reduce_sum(tf.nn.embedding_lookup(self.A, self.x, name='m_i_pre'), reduction_indices=[2], name='m_i') + self.TA
             self.memory_output = tf.reduce_sum(tf.nn.embedding_lookup(self.C, self.x, name='c_i_pre'), reduction_indices=[2], name='c_i')
             self.u = tf.reduce_sum(tf.nn.embedding_lookup(self.B, self.q, name='u_pre'), reduction_indices=[1], name='u', keep_dims=True)
 
