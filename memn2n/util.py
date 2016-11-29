@@ -96,3 +96,14 @@ def load_vocabulary(directory):
             pickle.dump((word2idx, idx2word), pfile)
 
     return word2idx, idx2word
+
+
+def calc_memory_capacity_for(dataset):
+    return max(map(lambda x: len(x), map(lambda x: x[0], dataset)))
+
+
+def calc_sentence_length_for(dataset):
+    return max(
+        max(len(tokenize(fact)) for sample in dataset for fact in sample[0]),
+        max(len(tokenize(sample[1])) for sample in dataset)
+    )
