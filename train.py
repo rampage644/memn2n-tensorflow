@@ -15,8 +15,8 @@ import memn2n.util
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('embedding_size', 20, 'Dimension of word embedding')
-tf.app.flags.DEFINE_integer('sentence_length', 10, 'Sentence length')
-tf.app.flags.DEFINE_integer('memory_size', 30, 'Max memory size')
+tf.app.flags.DEFINE_integer('sentence_length', 0, 'Sentence length')
+tf.app.flags.DEFINE_integer('memory_size', 0, 'Max memory size')
 tf.app.flags.DEFINE_integer('task_id', 1, 'Task id to train')
 tf.app.flags.DEFINE_integer('epoch', 1, 'Epoch number')
 tf.app.flags.DEFINE_integer('batch_size', 32, 'Batch size')
@@ -31,14 +31,30 @@ plt.style.use('fivethirtyeight')
 def main(argv=None):
     word2idx, idx2word = memn2n.util.load_vocabulary(FLAGS.train_dir)
     train, test = memn2n.util.load_dataset_for(FLAGS.task_id, FLAGS.train_dir)
+    train, test = list(train), list(test)
 
-    mem_train, query_train, answer_train = memn2n.util.vectorize_dataset(list(train), word2idx, FLAGS.memory_size, FLAGS.sentence_length)
-    mem_test, query_test, answer_test = memn2n.util.vectorize_dataset(list(test), word2idx, FLAGS.memory_size, FLAGS.sentence_length)
+    memory_size = max(
+        memn2n.util.calc_memory_capacity_for(train),
+        memn2n.util.calc_memory_capacity_for(test),
+        FLAGS.memory_size
+    )
+
+    sentence_length = max(
+        memn2n.util.calc_sentence_length_for(train),
+        memn2n.util.calc_sentence_length_for(test),
+        FLAGS.sentence_length
+    )
+
+    mem_train, query_train, answer_train = memn2n.util.vectorize_dataset(train, word2idx, memory_size, sentence_length)
+    mem_test, query_test, answer_test = memn2n.util.vectorize_dataset(test, word2idx, memory_size, sentence_length)
 
     with tf.Session() as sess:
         model = memn2n.model.MemN2N(
-            FLAGS.learning_rate, len(word2idx), FLAGS.embedding_size,
-            FLAGS.sentence_length, FLAGS.memory_size
+            FLAGS.learning_rate,
+            len(word2idx),
+            FLAGS.embedding_size,
+            sentence_length,
+            memory_size
         )
         writer = tf.train.SummaryWriter(FLAGS.log_dir, graph=tf.get_default_graph())
 
@@ -66,6 +82,8 @@ def main(argv=None):
             print('\rEpoch: {}/{}'.format(e+1, FLAGS.epoch), end='')
 
         accuracy_history = np.asarray(accuracy_history)
+        print()
+        print('Accuracy train: {}, test: {}'.format(accuracy_history[-1, 0], accuracy_history[-1, 1]))
         _, (ax1, ax2) = plt.subplots(2, 1)
         ax1.set_title('Loss')
         ax1.plot(loss_history)
