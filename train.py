@@ -20,6 +20,7 @@ tf.app.flags.DEFINE_integer('memory_size', 0, 'Max memory size')
 tf.app.flags.DEFINE_integer('task_id', 1, 'Task id to train')
 tf.app.flags.DEFINE_integer('epoch', 1, 'Epoch number')
 tf.app.flags.DEFINE_integer('batch_size', 32, 'Batch size')
+tf.app.flags.DEFINE_integer('hops', 3, 'Hop count')
 tf.app.flags.DEFINE_float('learning_rate', 0.001, 'Learning rate')
 tf.app.flags.DEFINE_string('train_dir', os.getcwd(), 'Directory with training files')
 tf.app.flags.DEFINE_string('log_dir', os.getcwd(), 'Directory for tensorboard logs')
@@ -53,6 +54,7 @@ def main(argv=None):
 
     with tf.Session() as sess:
         model = memn2n.model.MemN2N(
+            FLAGS.hops,
             FLAGS.learning_rate,
             len(word2idx),
             FLAGS.embedding_size,

@@ -11,7 +11,8 @@ import tensorflow as tf
 class MemN2N(object):
     '''End-to-End model'''
 
-    def __init__(self, lr, vocab_size, embedding_size, sentence_length, memory_size):
+    def __init__(self, hops, lr, vocab_size, embedding_size, sentence_length, memory_size):
+        self.hops = hops
         self.lr = lr
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
@@ -47,48 +48,71 @@ class MemN2N(object):
             self.q = tf.placeholder(tf.int32, [None, self.sentence_length], name='query')
             self.a = tf.placeholder(tf.int32, [None], name='answer')
 
+        self.embeddings = {}
         with tf.variable_scope('embeddings'):
             # +1 is for fixed zero input
             zero_embedding = tf.zeros([1, self.embedding_size])
 
-            self.A = tf.concat(0, [
+            B = tf.concat(0, [
                 zero_embedding,
-                tf.get_variable('A', [self.vocab_size, self.embedding_size], tf.float32),
+                tf.get_variable('B', [self.vocab_size, self.embedding_size], tf.float32),
             ])
-            self.TA = tf.get_variable('TA', [self.memory_size, self.embedding_size], tf.float32)
+            self.embeddings['B'] = B
+            C_prev = B
+            TC_prev = tf.get_variable('TB', [self.memory_size, self.embedding_size], tf.float32)
+            for k in range(1, self.hops + 1):
+                k = str(k)
 
-            self.B = tf.concat(0, [
-                zero_embedding,
-                tf.get_variable('B', [self.vocab_size, self.embedding_size], tf.float32)
-            ])
-            self.C = tf.concat(0, [
-                zero_embedding,
-                tf.get_variable('C', [self.vocab_size, self.embedding_size], tf.float32)
-            ])
-            self.TC = tf.get_variable('TC', [self.memory_size, self.embedding_size], tf.float32)
+                with tf.variable_scope('hop' + k):
+                    C = tf.concat(0, [
+                        zero_embedding,
+                        tf.get_variable('C', [self.vocab_size, self.embedding_size], tf.float32)
+                    ])
+                    TC = tf.get_variable('TC', [self.memory_size, self.embedding_size], tf.float32)
 
-            self.W = tf.concat(1, [
-                tf.get_variable('W', [self.embedding_size, self.vocab_size], tf.float32),
-                tf.transpose(zero_embedding)
-            ])
+                self.embeddings['A' + k] = C_prev
+                self.embeddings['TA' + k] = TC_prev
+                self.embeddings['C' + k] = C
+                self.embeddings['TC' + k] = TC
 
-            tf.histogram_summary('A', self.A)
-            tf.histogram_summary('B', self.B)
-            tf.histogram_summary('C', self.C)
-            tf.histogram_summary('W', self.W)
+                C_prev = C
+                TC_prev = TC
+
+                tf.histogram_summary('A' + k, self.embeddings['A' + k])
+                tf.histogram_summary('C' + k, C)
+
+            self.embeddings['W'] = tf.transpose(self.embeddings['C' + str(self.hops)])
 
     def _create_inference(self):
         with tf.variable_scope('model'):
-            self.memory_input = tf.reduce_sum(tf.nn.embedding_lookup(self.A, self.x, name='m_i_pre'), reduction_indices=[2], name='m_i') + self.TA
-            self.memory_output = tf.reduce_sum(tf.nn.embedding_lookup(self.C, self.x, name='c_i_pre'), reduction_indices=[2], name='c_i') + self.TC
-            self.u = tf.reduce_sum(tf.nn.embedding_lookup(self.B, self.q, name='u_pre'), reduction_indices=[1], name='u', keep_dims=True)
+            B, W = self.embeddings['B'], self.embeddings['W']
+            u_prev = tf.reduce_sum(tf.nn.embedding_lookup(B, self.q, name='u_pre'),
+                                   reduction_indices=[1], name='u', keep_dims=True)
 
-            self.probs = tf.reduce_sum(tf.mul(self.u, self.memory_input, name='u-m_i'), reduction_indices=[2], name='probs', keep_dims=True)
-            self.softmax_probs = tf.nn.softmax(self.probs, name='softmax_probs', dim=1)
+            for k in range(1, self.hops + 1):
+                k = str(k)
+                A, C, TA, TC = (
+                    self.embeddings['A' + k], self.embeddings['C' + k],
+                    self.embeddings['TA' + k], self.embeddings['TC' + k]
+                )
 
-            self.o = tf.reduce_sum(tf.mul(self.memory_output, self.softmax_probs, name='p-c_i'), reduction_indices=[1], name='o')
-            self.logits = tf.matmul(tf.squeeze(self.u) + self.o, self.W, name='logits')
+                with tf.variable_scope('hop' + k):
+                    m = tf.reduce_sum(tf.nn.embedding_lookup(A, self.x, name='m_i_pre'),
+                                      reduction_indices=[2], name='m_i') + TA
+                    c = tf.reduce_sum(tf.nn.embedding_lookup(C, self.x, name='c_i_pre'),
+                                      reduction_indices=[2], name='c_i') + TC
 
+                    p = tf.reduce_sum(tf.mul(u_prev, m, name='u-m_i'),
+                                      reduction_indices=[2], name='probs', keep_dims=True)
+                    softmax_p = tf.nn.softmax(p, name='softmax_probs', dim=1)
+
+                    o = tf.reduce_sum(tf.mul(c, softmax_p, name='p-c_i'),
+                                      reduction_indices=[1], name='o', keep_dims=True)
+
+                    u = u_prev + o
+                    u_prev = u
+
+            self.logits = tf.matmul(tf.squeeze(u), W, name='logits')
             self.predicted = tf.argmax(tf.nn.softmax(self.logits), 1)
 
 
