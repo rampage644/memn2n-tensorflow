@@ -34,8 +34,12 @@ class MemN2N(object):
             collections=[tf.GraphKeys.GLOBAL_STEP, tf.GraphKeys.VARIABLES]
         )
 
-        self.learning_rate = tf.train.exponential_decay(
-            self.lr, self.global_step, 100000, 0.96, staircase=True)
+        steps_per_epoch = 1000
+        self.learning_rate = tf.train.piecewise_constant(
+            self.global_step,
+            [steps_per_epoch * 15, steps_per_epoch * 30, steps_per_epoch * 45],
+            [self.lr, self.lr / 2, self.lr / 4, self.lr / 8]
+        )
 
         with tf.variable_scope('input'):
             # sentences - stories - facts
@@ -61,6 +65,7 @@ class MemN2N(object):
                 zero_embedding,
                 tf.get_variable('C', [self.vocab_size, self.embedding_size], tf.float32)
             ])
+            self.TC = tf.get_variable('TC', [self.memory_size, self.embedding_size], tf.float32)
 
             self.W = tf.concat(1, [
                 tf.get_variable('W', [self.embedding_size, self.vocab_size], tf.float32),
@@ -75,7 +80,7 @@ class MemN2N(object):
     def _create_inference(self):
         with tf.variable_scope('model'):
             self.memory_input = tf.reduce_sum(tf.nn.embedding_lookup(self.A, self.x, name='m_i_pre'), reduction_indices=[2], name='m_i') + self.TA
-            self.memory_output = tf.reduce_sum(tf.nn.embedding_lookup(self.C, self.x, name='c_i_pre'), reduction_indices=[2], name='c_i')
+            self.memory_output = tf.reduce_sum(tf.nn.embedding_lookup(self.C, self.x, name='c_i_pre'), reduction_indices=[2], name='c_i') + self.TC
             self.u = tf.reduce_sum(tf.nn.embedding_lookup(self.B, self.q, name='u_pre'), reduction_indices=[1], name='u', keep_dims=True)
 
             self.probs = tf.reduce_sum(tf.mul(self.u, self.memory_input, name='u-m_i'), reduction_indices=[2], name='probs', keep_dims=True)
