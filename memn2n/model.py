@@ -34,10 +34,10 @@ class MemN2N(object):
             collections=[tf.GraphKeys.GLOBAL_STEP, tf.GraphKeys.VARIABLES]
         )
 
-        steps_per_epoch = 1000
+        steps_per_epoch = 500
         self.learning_rate = tf.train.piecewise_constant(
             self.global_step,
-            [steps_per_epoch * 15, steps_per_epoch * 30, steps_per_epoch * 45],
+            [steps_per_epoch * 3, steps_per_epoch * 6, steps_per_epoch * 9],
             [self.lr, self.lr / 2, self.lr / 4, self.lr / 8]
         )
 

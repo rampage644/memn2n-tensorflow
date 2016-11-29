@@ -14,7 +14,7 @@ import memn2n.util
 
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer('embedding_size', 20, 'Dimension of word embedding')
+tf.app.flags.DEFINE_integer('embedding_size', 15, 'Dimension of word embedding')
 tf.app.flags.DEFINE_integer('sentence_length', 0, 'Sentence length')
 tf.app.flags.DEFINE_integer('memory_size', 0, 'Max memory size')
 tf.app.flags.DEFINE_integer('task_id', 1, 'Task id to train')
@@ -31,7 +31,10 @@ plt.style.use('fivethirtyeight')
 def main(argv=None):
     word2idx, idx2word = memn2n.util.load_vocabulary(FLAGS.train_dir)
     train, test = memn2n.util.load_dataset_for(FLAGS.task_id, FLAGS.train_dir)
-    train, test = list(train), list(test)
+    data = list(train) + list(test)
+    # keep 10% for validation
+    train_size = int((1 - 0.1) * len(data))
+    train, test = data[:train_size], data[train_size:]
 
     memory_size = max(
         memn2n.util.calc_memory_capacity_for(train),
@@ -61,10 +64,11 @@ def main(argv=None):
         sess.run(tf.initialize_all_variables())
         loss_history = []
         accuracy_history = []
+        t = []
 
         for e in range(FLAGS.epoch):
             for step in range(0, len(mem_train), FLAGS.batch_size):
-                start, end = step, step+FLAGS.batch_size if step + FLAGS.batch_size < len(mem_train) else None
+                start, end = step, step+FLAGS.batch_size if step + 2 * FLAGS.batch_size < len(mem_train) else None
                 loss, predicted, summary, _ = sess.run([model.loss, model.predicted, model.summary_op, model.train_op], {
                     model.x: mem_train[start:end],
                     model.q: query_train[start:end],
@@ -72,6 +76,7 @@ def main(argv=None):
                 })
 
                 loss_history.append(loss)
+                t.append(tf.train.global_step(sess, model.global_step))
                 writer.add_summary(summary)
 
             accuracy_history.append(np.array([
@@ -86,8 +91,8 @@ def main(argv=None):
         print('Accuracy train: {}, test: {}'.format(accuracy_history[-1, 0], accuracy_history[-1, 1]))
         _, (ax1, ax2) = plt.subplots(2, 1)
         ax1.set_title('Loss')
-        ax1.plot(loss_history)
-        ax1.plot(np.r_[loss_history[:20], memn2n.util.moving_average(loss_history, n=20)])
+        ax1.plot(t, loss_history)
+        ax1.plot(t, np.r_[loss_history[:19], memn2n.util.moving_average(loss_history, n=20)])
         ax2.set_title('Accuracy')
         ax2.plot(accuracy_history[:, 0])
         ax2.plot(accuracy_history[:, 1])
