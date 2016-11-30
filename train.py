@@ -17,7 +17,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('embedding_size', 15, 'Dimension of word embedding')
 tf.app.flags.DEFINE_integer('sentence_length', 0, 'Sentence length')
 tf.app.flags.DEFINE_integer('memory_size', 0, 'Max memory size')
-tf.app.flags.DEFINE_integer('task_id', 1, 'Task id to train')
+tf.app.flags.DEFINE_integer('task_id', 0, 'Task id to train')
 tf.app.flags.DEFINE_integer('epoch', 1, 'Epoch number')
 tf.app.flags.DEFINE_integer('batch_size', 32, 'Batch size')
 tf.app.flags.DEFINE_integer('hops', 3, 'Hop count')
@@ -25,6 +25,7 @@ tf.app.flags.DEFINE_float('learning_rate', 0.001, 'Learning rate')
 tf.app.flags.DEFINE_string('train_dir', os.getcwd(), 'Directory with training files')
 tf.app.flags.DEFINE_string('log_dir', os.getcwd(), 'Directory for tensorboard logs')
 tf.app.flags.DEFINE_boolean('pe', False, 'Enable position encoding')
+tf.app.flags.DEFINE_boolean('joint', False, 'Train model on all tasks instead of one')
 
 
 plt.style.use('fivethirtyeight')
@@ -32,11 +33,20 @@ plt.style.use('fivethirtyeight')
 
 def main(argv=None):
     word2idx, idx2word = memn2n.util.load_vocabulary(FLAGS.train_dir)
-    train, test = memn2n.util.load_dataset_for(FLAGS.task_id, FLAGS.train_dir)
-    data = list(train) + list(test)
-    # keep 10% for validation
-    train_size = int((1 - 0.1) * len(data))
-    train, test = data[:train_size], data[train_size:]
+    if FLAGS.joint:
+        train = []
+        for task_id in range(1, 21):
+            train_task, test_task = memn2n.util.load_dataset_for(task_id, FLAGS.train_dir)
+            train.extend(train_task)
+            train.extend(test_task)
+        train_task, test_task = memn2n.util.load_dataset_for(FLAGS.task_id, FLAGS.train_dir)
+        test = list(train_task) + list(test_task)
+    else:
+        train, test = memn2n.util.load_dataset_for(FLAGS.task_id, FLAGS.train_dir)
+        data = list(train) + list(test)
+        # keep 10% for validation
+        train_size = int((1 - 0.1) * len(data))
+        train, test = data[:train_size], data[train_size:]
 
     memory_size = max(
         memn2n.util.calc_memory_capacity_for(train),
@@ -84,8 +94,14 @@ def main(argv=None):
                 writer.add_summary(summary)
 
             accuracy_history.append(np.array([
-                sess.run(model.accuracy, {model.x: mem_train, model.q: query_train, model.a: answer_train}),
-                sess.run(model.accuracy, {model.x: mem_test, model.q: query_test, model.a: answer_test})
+                sess.run(model.accuracy, {
+                    model.x: mem_train[start:end],
+                    model.q: query_train[start:end],
+                    model.a: answer_train[start:end]}),
+                sess.run(model.accuracy, {
+                    model.x: mem_test,
+                    model.q: query_test,
+                    model.a: answer_test})
             ]))
 
             print('\rEpoch: {}/{}'.format(e+1, FLAGS.epoch), end='')
