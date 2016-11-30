@@ -1,4 +1,3 @@
-
 '''Model'''
 from __future__ import absolute_import
 from __future__ import division
@@ -6,12 +5,14 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import tensorflow as tf
+import numpy as np
 
-
+#pylint: disable=C0103
 class MemN2N(object):
     '''End-to-End model'''
 
-    def __init__(self, hops, lr, vocab_size, embedding_size, sentence_length, memory_size):
+    def __init__(self, use_pe, hops, lr, vocab_size, embedding_size, sentence_length, memory_size):
+        self.use_pe = use_pe
         self.hops = hops
         self.lr = lr
         self.vocab_size = vocab_size
@@ -26,6 +27,9 @@ class MemN2N(object):
         self._create_accuracy()
 
         self.summary_op = tf.merge_all_summaries()
+
+    def _encoding(self, embeddings):
+        return tf.mul(self.l_pe, embeddings) if self.use_pe else embeddings
 
     def _create_variables(self):
         self.global_step = tf.Variable(
@@ -42,9 +46,17 @@ class MemN2N(object):
             [self.lr, self.lr / 2, self.lr / 4, self.lr / 8]
         )
 
+        J, D = self.sentence_length, self.embedding_size
+        j = np.expand_dims(np.linspace(1, J, J), 0)
+        k = np.expand_dims(np.linspace(1, D, D), 1)
+        l = (1 - j / J) - k / D * (1 - 2 * j / J)
+        self.l_pe = tf.constant(l, tf.float32, shape=[J, D])
+
         with tf.variable_scope('input'):
             # sentences - stories - facts
-            self.x = tf.placeholder(tf.int32, [None, self.memory_size, self.sentence_length], name='facts')
+            self.x = tf.placeholder(tf.int32,
+                                    [None, self.memory_size, self.sentence_length],
+                                    name='facts')
             self.q = tf.placeholder(tf.int32, [None, self.sentence_length], name='query')
             self.a = tf.placeholder(tf.int32, [None], name='answer')
 
@@ -86,7 +98,7 @@ class MemN2N(object):
     def _create_inference(self):
         with tf.variable_scope('model'):
             B, W = self.embeddings['B'], self.embeddings['W']
-            u_prev = tf.reduce_sum(tf.nn.embedding_lookup(B, self.q, name='u_pre'),
+            u_prev = tf.reduce_sum(self._encoding(tf.nn.embedding_lookup(B, self.q, name='u_pre')),
                                    reduction_indices=[1], name='u', keep_dims=True)
 
             for k in range(1, self.hops + 1):
@@ -97,10 +109,12 @@ class MemN2N(object):
                 )
 
                 with tf.variable_scope('hop' + k):
-                    m = tf.reduce_sum(tf.nn.embedding_lookup(A, self.x, name='m_i_pre'),
-                                      reduction_indices=[2], name='m_i') + TA
-                    c = tf.reduce_sum(tf.nn.embedding_lookup(C, self.x, name='c_i_pre'),
-                                      reduction_indices=[2], name='c_i') + TC
+                    m = tf.reduce_sum(
+                        self._encoding(tf.nn.embedding_lookup(A, self.x, name='m_i_pre')),
+                        reduction_indices=[2], name='m_i') + TA
+                    c = tf.reduce_sum(
+                        self._encoding(tf.nn.embedding_lookup(C, self.x, name='c_i_pre')),
+                        reduction_indices=[2], name='c_i') + TC
 
                     p = tf.reduce_sum(tf.mul(u_prev, m, name='u-m_i'),
                                       reduction_indices=[2], name='probs', keep_dims=True)
@@ -119,7 +133,8 @@ class MemN2N(object):
     def _create_loss(self):
         with tf.variable_scope('loss'):
             a_one_hot = tf.one_hot(self.a, self.vocab_size + 1, name='answer_one_hot')
-            self.loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(self.logits, a_one_hot, name='loss'))
+            self.loss = tf.reduce_sum(
+                tf.nn.softmax_cross_entropy_with_logits(self.logits, a_one_hot, name='loss'))
 
             tf.scalar_summary('Loss', self.loss)
 

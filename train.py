@@ -24,6 +24,7 @@ tf.app.flags.DEFINE_integer('hops', 3, 'Hop count')
 tf.app.flags.DEFINE_float('learning_rate', 0.001, 'Learning rate')
 tf.app.flags.DEFINE_string('train_dir', os.getcwd(), 'Directory with training files')
 tf.app.flags.DEFINE_string('log_dir', os.getcwd(), 'Directory for tensorboard logs')
+tf.app.flags.DEFINE_boolean('pe', False, 'Enable position encoding')
 
 
 plt.style.use('fivethirtyeight')
@@ -54,6 +55,7 @@ def main(argv=None):
 
     with tf.Session() as sess:
         model = memn2n.model.MemN2N(
+            FLAGS.pe,
             FLAGS.hops,
             FLAGS.learning_rate,
             len(word2idx),
