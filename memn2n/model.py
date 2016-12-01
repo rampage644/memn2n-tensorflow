@@ -34,9 +34,7 @@ class MemN2N(object):
     def _create_variables(self):
         self.global_step = tf.Variable(
             initial_value=0,
-            name="global_step",
-            trainable=False,
-            collections=[tf.GraphKeys.GLOBAL_STEP, tf.GraphKeys.VARIABLES]
+            trainable=False
         )
 
         steps_per_epoch = 500

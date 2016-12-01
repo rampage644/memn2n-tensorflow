@@ -73,6 +73,7 @@ def main(argv=None):
             sentence_length,
             memory_size
         )
+        sess.run(tf.global_variables_initializer())
         writer = tf.train.SummaryWriter(FLAGS.log_dir, graph=tf.get_default_graph())
 
         sess.run(tf.initialize_all_variables())
