@@ -14,19 +14,19 @@ import memn2n.util
 
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer('embedding_size', 15, 'Dimension of word embedding')
-tf.app.flags.DEFINE_integer('sentence_length', 0, 'Sentence length')
-tf.app.flags.DEFINE_integer('memory_size', 0, 'Max memory size')
-tf.app.flags.DEFINE_integer('task_id', 0, 'Task id to train')
-tf.app.flags.DEFINE_integer('epoch', 1, 'Epoch number')
+tf.app.flags.DEFINE_integer('embedding_size', 15, 'Dimension for word embedding')
+tf.app.flags.DEFINE_integer('sentence_length', 0, 'Sentence length. Provide to redefine automatically calculated (max would be taken).')
+tf.app.flags.DEFINE_integer('memory_size', 0, 'Memory size. Provide to redefine automatically calculated (max would be taken).')
+tf.app.flags.DEFINE_integer('task_id', 0, 'Task number to test and train or (in case of independent train)')
+tf.app.flags.DEFINE_integer('epoch', 1, 'Epoch count')
 tf.app.flags.DEFINE_integer('batch_size', 32, 'Batch size')
-tf.app.flags.DEFINE_integer('hops', 3, 'Hop count')
-tf.app.flags.DEFINE_float('learning_rate', 0.001, 'Learning rate')
+tf.app.flags.DEFINE_integer('hops', 3, 'Hops (layers) count')
+tf.app.flags.DEFINE_float('learning_rate', 0.001, 'Starting learning rate')
 tf.app.flags.DEFINE_string('train_dir', os.getcwd(), 'Directory with training files')
 tf.app.flags.DEFINE_string('log_dir', os.getcwd(), 'Directory for tensorboard logs')
 tf.app.flags.DEFINE_string('ckpt_dir', os.getcwd(), 'Directory for saving/restoring checkpoints')
 tf.app.flags.DEFINE_boolean('pe', False, 'Enable position encoding')
-tf.app.flags.DEFINE_boolean('joint', False, 'Train model on all tasks instead of one')
+tf.app.flags.DEFINE_boolean('joint', False, 'Train model jointly (that is on all tasks instead of one).')
 
 
 plt.style.use('fivethirtyeight')
