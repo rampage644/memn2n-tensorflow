@@ -24,6 +24,7 @@ tf.app.flags.DEFINE_integer('hops', 3, 'Hop count')
 tf.app.flags.DEFINE_float('learning_rate', 0.001, 'Learning rate')
 tf.app.flags.DEFINE_string('train_dir', os.getcwd(), 'Directory with training files')
 tf.app.flags.DEFINE_string('log_dir', os.getcwd(), 'Directory for tensorboard logs')
+tf.app.flags.DEFINE_string('ckpt_dir', os.getcwd(), 'Directory for saving/restoring checkpoints')
 tf.app.flags.DEFINE_boolean('pe', False, 'Enable position encoding')
 tf.app.flags.DEFINE_boolean('joint', False, 'Train model on all tasks instead of one')
 
@@ -63,6 +64,7 @@ def main(argv=None):
     mem_train, query_train, answer_train = memn2n.util.vectorize_dataset(train, word2idx, memory_size, sentence_length)
     mem_test, query_test, answer_test = memn2n.util.vectorize_dataset(test, word2idx, memory_size, sentence_length)
 
+
     with tf.Session() as sess:
         model = memn2n.model.MemN2N(
             FLAGS.pe,
@@ -74,9 +76,16 @@ def main(argv=None):
             memory_size
         )
         sess.run(tf.global_variables_initializer())
+
+        saver = tf.train.Saver()
         writer = tf.train.SummaryWriter(FLAGS.log_dir, graph=tf.get_default_graph())
 
-        sess.run(tf.initialize_all_variables())
+        saved_model = tf.train.latest_checkpoint(FLAGS.ckpt_dir)
+        if saved_model:
+            saver.restore(sess, saved_model)
+        else:
+            print('Prevous model not found, starting from scratch.')
+
         loss_history = []
         accuracy_history = []
         t = []
@@ -106,6 +115,10 @@ def main(argv=None):
             ]))
 
             print('\rEpoch: {}/{}'.format(e+1, FLAGS.epoch), end='')
+
+        if not os.path.exists(FLAGS.ckpt_dir):
+            os.makedirs(FLAGS.ckpt_dir)
+        saver.save(sess, os.path.join(FLAGS.ckpt_dir, 'memn2n'), global_step=model.global_step)
 
         accuracy_history = np.asarray(accuracy_history)
         print()
