@@ -11,7 +11,10 @@ import numpy as np
 class MemN2N(object):
     '''End-to-End model'''
 
-    def __init__(self, use_pe, hops, lr, vocab_size, embedding_size, sentence_length, memory_size):
+    def __init__(self, steps_per_epoch, epoch, anneal_every, use_pe, hops, lr, vocab_size, embedding_size, sentence_length, memory_size):
+        self.anneal_every = anneal_every
+        self.steps_per_epoch = steps_per_epoch
+        self.epoch = epoch
         self.use_pe = use_pe
         self.hops = hops
         self.lr = lr
@@ -36,12 +39,13 @@ class MemN2N(object):
             initial_value=0,
             trainable=False
         )
+        boundaries = np.arange(0, self.epoch, self.anneal_every) * self.steps_per_epoch
+        learning_rates = self.lr / (2 ** np.arange(len(boundaries) + 1))
 
-        steps_per_epoch = 500
         self.learning_rate = tf.train.piecewise_constant(
             self.global_step,
-            [steps_per_epoch * 3, steps_per_epoch * 6, steps_per_epoch * 9],
-            [self.lr, self.lr / 2, self.lr / 4, self.lr / 8]
+            list(boundaries.astype(np.int32)),
+            [self.lr] + list(learning_rates.astype(np.float32))
         )
 
         J, D = self.sentence_length, self.embedding_size

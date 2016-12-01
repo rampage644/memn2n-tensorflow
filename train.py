@@ -19,6 +19,7 @@ tf.app.flags.DEFINE_integer('sentence_length', 0, 'Sentence length. Provide to r
 tf.app.flags.DEFINE_integer('memory_size', 50, 'Memory size. Provide to redefine automatically calculated (min would be taken).')
 tf.app.flags.DEFINE_integer('task_id', 0, 'Task number to test and train or (in case of independent train)')
 tf.app.flags.DEFINE_integer('epoch', 1, 'Epoch count')
+tf.app.flags.DEFINE_integer('anneal_every', 10, 'Anneal (halve) learning rate every `anneal_every` epoch')
 tf.app.flags.DEFINE_integer('batch_size', 32, 'Batch size')
 tf.app.flags.DEFINE_integer('hops', 3, 'Hops (layers) count')
 tf.app.flags.DEFINE_float('learning_rate', 0.001, 'Starting learning rate')
@@ -66,7 +67,11 @@ def main(argv=None):
 
 
     with tf.Session() as sess:
+        steps_per_epoch = len(mem_train) // FLAGS.batch_size + 1
         model = memn2n.model.MemN2N(
+            steps_per_epoch,
+            FLAGS.epoch,
+            FLAGS.anneal_every,
             FLAGS.pe,
             FLAGS.hops,
             FLAGS.learning_rate,
