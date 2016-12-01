@@ -60,11 +60,11 @@ def vectorize_dataset(dataset, word2idx, memory_size, sentence_length):
         return word2idx.get(x, 0)
 
     def pad_2d_to(width, array):
-        d1, d2 = width[0] - array.shape[0], width[1] - array.shape[1]
+        d1, d2 = abs(width[0] - array.shape[0]), abs(width[1] - array.shape[1])
         return np.pad(array, ((0, d1), (0, d2)), 'constant')
 
     def pad_1d_to(width, array):
-        d = width - array.shape[0]
+        d = abs(width - array.shape[0])
         return np.pad(array, ((0, d)), 'constant')
 
     N = len(dataset)
@@ -72,7 +72,7 @@ def vectorize_dataset(dataset, word2idx, memory_size, sentence_length):
     query = np.zeros((N, sentence_length))
     answer = np.zeros((N))
     for idx, (fcts, q, a) in enumerate(dataset):
-        facts[idx] = pad_2d_to([memory_size, sentence_length], np.vstack([pad_1d_to(sentence_length, np.fromiter(map(word2idx_func, tokenize(f)), np.int32)) for f in fcts]))
+        facts[idx] = pad_2d_to([memory_size, sentence_length], np.vstack([pad_1d_to(sentence_length, np.fromiter(map(word2idx_func, tokenize(f)), np.int32)) for f in fcts])[-memory_size:])
         query[idx] = pad_1d_to(sentence_length, np.fromiter(map(word2idx_func, tokenize(q)), np.int32))
         answer[idx] = word2idx_func(a)
     return facts, query, answer

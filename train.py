@@ -16,7 +16,7 @@ import memn2n.util
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('embedding_size', 15, 'Dimension for word embedding')
 tf.app.flags.DEFINE_integer('sentence_length', 0, 'Sentence length. Provide to redefine automatically calculated (max would be taken).')
-tf.app.flags.DEFINE_integer('memory_size', 0, 'Memory size. Provide to redefine automatically calculated (max would be taken).')
+tf.app.flags.DEFINE_integer('memory_size', 50, 'Memory size. Provide to redefine automatically calculated (min would be taken).')
 tf.app.flags.DEFINE_integer('task_id', 0, 'Task number to test and train or (in case of independent train)')
 tf.app.flags.DEFINE_integer('epoch', 1, 'Epoch count')
 tf.app.flags.DEFINE_integer('batch_size', 32, 'Batch size')
@@ -49,7 +49,7 @@ def main(argv=None):
         train_size = int((1 - 0.1) * len(data))
         train, test = data[:train_size], data[train_size:]
 
-    memory_size = max(
+    memory_size = min(
         memn2n.util.calc_memory_capacity_for(train),
         memn2n.util.calc_memory_capacity_for(test),
         FLAGS.memory_size
@@ -85,6 +85,8 @@ def main(argv=None):
             saver.restore(sess, saved_model)
         else:
             print('Prevous model not found, starting from scratch.')
+        if not os.path.exists(FLAGS.ckpt_dir):
+            os.makedirs(FLAGS.ckpt_dir)
 
         loss_history = []
         accuracy_history = []
@@ -92,7 +94,8 @@ def main(argv=None):
 
         for e in range(FLAGS.epoch):
             for step in range(0, len(mem_train), FLAGS.batch_size):
-                start, end = step, step+FLAGS.batch_size if step + 2 * FLAGS.batch_size < len(mem_train) else None
+                # FIXME: last batch size should not to be less than `batch_size`
+                start, end = step, step+FLAGS.batch_size if step + FLAGS.batch_size < len(mem_train) else None
                 loss, predicted, summary, _ = sess.run([model.loss, model.predicted, model.summary_op, model.train_op], {
                     model.x: mem_train[start:end],
                     model.q: query_train[start:end],
@@ -116,8 +119,7 @@ def main(argv=None):
 
             print('\rEpoch: {}/{}'.format(e+1, FLAGS.epoch), end='')
 
-        if not os.path.exists(FLAGS.ckpt_dir):
-            os.makedirs(FLAGS.ckpt_dir)
+
         saver.save(sess, os.path.join(FLAGS.ckpt_dir, 'memn2n'), global_step=model.global_step)
 
         accuracy_history = np.asarray(accuracy_history)

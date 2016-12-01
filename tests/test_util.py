@@ -3,6 +3,8 @@
 from unittest.mock import patch, MagicMock
 from memn2n import util
 
+import numpy as np
+
 
 FILE_CONTENTS = '''1 Mary got the milk.
 2 John moved to the bedroom.
@@ -136,5 +138,30 @@ def test_sentence_length_calc():
         dataset = list(util.load_dataset('filename'))
         capacity = util.calc_sentence_length_for(dataset)
         assert capacity == 8
+
+
+def test_vectorize_dataset():
+    from nltk.tokenize import word_tokenize as tokenize
+    m = MagicMock(name='open')
+    m().__enter__().__iter__.return_value = iter(FILE_CONTENTS.splitlines())
+    with patch('memn2n.util.open', m):
+        dataset = list(util.load_dataset('filename'))
+
+        memory_size, sentence_length = 20, 15
+        # fake vocabulary to make sure we get correct memories
+        word2idx = {
+           'John': 1,
+           'discarded': 2,
+           'the': 3,
+           'apple': 4,
+           'there': 5,
+           '.': 6
+        }
+        fcts, q, a = util.vectorize_dataset(dataset, word2idx, memory_size, sentence_length)
+
+        assert fcts.shape == (6, memory_size, sentence_length)
+        assert q.shape == (6, sentence_length)
+        # last memory from particular sample
+        assert np.all(fcts[-1][-1] == [1, 2, 3, 4, 5, 6] + [0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
