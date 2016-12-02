@@ -66,6 +66,21 @@ def main(argv=None):
 
     with tf.Session() as sess:
         steps_per_epoch = len(mem_train) // FLAGS.batch_size + 1
+        print('Model details:')
+        for (name, value) in (
+            ('step per epoch', steps_per_epoch),
+            ('epoch', FLAGS.epoch),
+            ('anneal every', FLAGS.anneal_every),
+            ('position encoding', FLAGS.pe),
+            ('hops', FLAGS.hops),
+            ('learning_rate', FLAGS.learning_rate),
+            ('vocab_size', len(word2idx)),
+            ('embdding size', FLAGS.embedding_size),
+            ('sentence length', sentence_length),
+            ('memory size', memory_size)
+        ):
+            print('{}: {}'.format(name, value))
+
         model = memn2n.model.MemN2N(
             steps_per_epoch,
             FLAGS.epoch,
