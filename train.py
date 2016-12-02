@@ -52,13 +52,11 @@ def main(argv=None):
 
     memory_size = min(
         memn2n.util.calc_memory_capacity_for(train),
-        memn2n.util.calc_memory_capacity_for(test),
         FLAGS.memory_size
     )
 
     sentence_length = max(
         memn2n.util.calc_sentence_length_for(train),
-        memn2n.util.calc_sentence_length_for(test),
         FLAGS.sentence_length
     )
 
